@@ -151,7 +151,7 @@ function update() {
   // Poop progress only during 'squat'
   if (coco.poopState === 'squat') {
     if (wetLevel < 0.6) {
-      poopProgress = Math.min(1, poopProgress + 0.003);
+      poopProgress = Math.min(1, poopProgress + 0.008);
     } else {
       // Too wet → abort squat
       coco.wetShake = 20;
@@ -187,13 +187,13 @@ function updateCoco() {
     if (coco.poopState === 'wander') {
       // Decide next action: pee (40%), squat (30%), keep wandering (30%)
       const r = Math.random();
-      if (r < 0.40) {
+      if (r < 0.30) {
         coco.poopState = 'pee';
-        coco.actionTimer = 100 + Math.random() * 80;  // pee duration
+        coco.actionTimer = 100 + Math.random() * 80;
         coco.vx = 0;
-      } else if (r < 0.70) {
+      } else if (r < 0.75) {
         coco.poopState = 'squat';
-        coco.actionTimer = 60 + Math.random() * 60;
+        coco.actionTimer = 90 + Math.random() * 80;  // longer squat
         coco.vx = 0;
       } else {
         pickNewTarget();
@@ -288,13 +288,32 @@ function draw() {
 }
 
 function drawRain() {
+  const ux = umbrella.x;
+  const uy = umbrella.y;
+  const r = umbrella.width / 2;
+
   ctx.save();
   for (const d of drops) {
+    // Skip drops that are inside the umbrella canopy (semicircle above uy)
+    const dx = d.x - ux;
+    const dy = d.y - uy;
+    if (dy <= 0 && dx * dx + dy * dy < r * r) continue;
+    // Also clip the line endpoint if it would enter the canopy
+    let ex = d.x - 2;
+    let ey = d.y + d.len;
+    const edx = ex - ux;
+    const edy = ey - uy;
+    if (edy <= 0 && edx * edx + edy * edy < r * r) {
+      // Shorten the line so it stops at the umbrella edge
+      const t = Math.sqrt(r * r / (dx * dx + dy * dy || 1));
+      ex = ux + dx * t - 2;
+      ey = uy + dy * t;
+    }
     ctx.strokeStyle = `rgba(174,214,241,${d.alpha})`;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(d.x, d.y);
-    ctx.lineTo(d.x - 2, d.y + d.len);
+    ctx.lineTo(ex, ey);
     ctx.stroke();
   }
   ctx.restore();
