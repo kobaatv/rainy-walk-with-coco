@@ -3,46 +3,51 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
 
-// UI elements
-const poopBarEl = document.getElementById('poop-bar');
-const wetBarEl = document.getElementById('wet-bar');
-const overlay = document.getElementById('overlay');
+const poopBarEl  = document.getElementById('poop-bar');
+const wetBarEl   = document.getElementById('wet-bar');
+const overlay    = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
-const overlayMsg = document.getElementById('overlay-msg');
-const startBtn = document.getElementById('start-btn');
+const overlayMsg   = document.getElementById('overlay-msg');
+const startBtn     = document.getElementById('start-btn');
+
+// ── Constants ────────────────────────────────────────────────
+const POOPS_TO_WIN  = 4;     // うんち4回でクリア
+const WET_RATE      = 0.018; // 傘なしで濡れる速さ（速め）
+const DRY_RATE      = 0.005; // 傘あり通常の乾く速さ
+const DRY_RATE_PEE  = 0.014; // おしっこ中・傘あり時の乾く速さ（速い）
+const POOP_RATE     = 0.010; // うんちゲージ進行速度
 
 // ── Game state ──────────────────────────────────────────────
-let state = 'title'; // 'title' | 'playing' | 'result'
-let poopProgress = 0;   // 0→1 fill up to win
-let wetLevel = 0;       // 0→1 too wet = poop interrupted
+let state = 'title';
+let poopProgress = 0;  // 0→1 で1回のうんち完了
+let poopsLeft    = POOPS_TO_WIN;
+let wetLevel     = 0;  // 0→1
 let frameId;
 
-// Umbrella (player)
+// Umbrella
 const umbrella = {
   x: W / 2,
   y: H * 0.35,
-  width: 180,   // bigger umbrella
+  width: 180,
   speed: 7,
   moving: 0,
 };
 
-// Coco (dog)
+// Coco
 // poopState: 'wander' | 'pee' | 'squat'
-// During 'pee', poop doesn't progress → breathing room to dry off
 const coco = {
   x: W / 2,
   y: H * 0.62,
   vx: 0,
   poopState: 'wander',
-  actionTimer: 0,
+  actionTimer: 80,
   wanderTarget: W / 2,
   wetShake: 0,
-  particles: [],  // {emoji, x, y, vy, alpha, size}
+  particles: [],
 };
 
-// Rain drops
 const drops = [];
-const DROP_COUNT = 160;
+const DROP_COUNT = 180;
 
 // ── Input ────────────────────────────────────────────────────
 const keys = {};
@@ -52,25 +57,31 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
 
+// Touch: left half = move left, right half = move right
+const touchControls = document.getElementById('touch-controls');
+const btnLeft  = document.getElementById('btn-left');
+const btnRight = document.getElementById('btn-right');
+
+function setTouchActive(active) {
+  touchControls.classList.toggle('active', active);
+}
+
+btnLeft.addEventListener('touchstart',  e => { umbrella.moving = -1; e.preventDefault(); }, { passive: false });
+btnLeft.addEventListener('touchend',    e => { umbrella.moving = 0;  e.preventDefault(); }, { passive: false });
+btnRight.addEventListener('touchstart', e => { umbrella.moving =  1; e.preventDefault(); }, { passive: false });
+btnRight.addEventListener('touchend',   e => { umbrella.moving = 0;  e.preventDefault(); }, { passive: false });
+
+// Fallback: also allow direct canvas swipe (keeps old behaviour as backup)
 let touchStartX = null;
 canvas.addEventListener('touchstart', e => {
+  if (state !== 'playing') return;
   touchStartX = e.touches[0].clientX;
-  e.preventDefault();
-}, { passive: false });
-canvas.addEventListener('touchmove', e => {
-  if (touchStartX === null || state !== 'playing') return;
-  const dx = e.touches[0].clientX - touchStartX;
-  umbrella.moving = dx < -5 ? -1 : dx > 5 ? 1 : 0;
-  e.preventDefault();
-}, { passive: false });
-canvas.addEventListener('touchend', () => {
-  umbrella.moving = 0;
-  touchStartX = null;
-});
+}, { passive: true });
+canvas.addEventListener('touchend', () => { touchStartX = null; });
 
 startBtn.addEventListener('click', startGame);
 
-// ── Init rain ────────────────────────────────────────────────
+// ── Rain ─────────────────────────────────────────────────────
 function initRain() {
   drops.length = 0;
   for (let i = 0; i < DROP_COUNT; i++) drops.push(newDrop(true));
@@ -80,8 +91,8 @@ function newDrop(randomY = false) {
   return {
     x: Math.random() * W,
     y: randomY ? Math.random() * H : -10,
-    len: 8 + Math.random() * 12,
-    speed: 7 + Math.random() * 6,
+    len: 8 + Math.random() * 14,
+    speed: 8 + Math.random() * 6,
     alpha: 0.3 + Math.random() * 0.5,
   };
 }
@@ -90,30 +101,33 @@ function newDrop(randomY = false) {
 function startGame() {
   state = 'playing';
   poopProgress = 0;
-  wetLevel = 0;
-  umbrella.x = W / 2;
+  poopsLeft    = POOPS_TO_WIN;
+  wetLevel     = 0;
+  umbrella.x   = W / 2;
   umbrella.moving = 0;
   coco.x = W / 2;
   coco.vx = 0;
-  coco.poopState = 'wander';
+  coco.poopState  = 'wander';
   coco.actionTimer = 80;
   coco.wanderTarget = W / 2;
-  coco.wetShake = 0;
-  coco.particles = [];
+  coco.wetShake   = 0;
+  coco.particles  = [];
   overlay.style.display = 'none';
+  setTouchActive(true);
   initRain();
   if (!frameId) loop();
 }
 
 function endGame(won) {
   state = 'result';
+  setTouchActive(false);
   overlay.style.display = 'flex';
   if (won) {
     overlayTitle.textContent = '🎉 ミッション完了！';
-    overlayMsg.textContent = 'ちゃんとうんちできたね！\nよかったよかった 💩✨\n\nナイス傘さし！';
+    overlayMsg.textContent = `${POOPS_TO_WIN}回全部うんちできたね！\n完璧な傘さしでした 💩✨`;
   } else {
-    overlayTitle.textContent = '💧 ぬれちゃった！';
-    overlayMsg.textContent = 'あ〜！ぬれすぎてうんちが止まっちゃった！\nおしっこ中に乾かして備えよう！';
+    overlayTitle.textContent = '💧 ぬれすぎた！';
+    overlayMsg.textContent = 'びしょ濡れでうんちどころじゃない！\nおしっこ中に乾かしておこう！';
   }
   startBtn.textContent = 'もう一回！';
 }
@@ -126,7 +140,6 @@ function update() {
   if (keys['ArrowLeft'])       umbrella.moving = -1;
   else if (keys['ArrowRight']) umbrella.moving = 1;
   else if (!touchStartX)       umbrella.moving = 0;
-
   umbrella.x += umbrella.moving * umbrella.speed;
   umbrella.x = clamp(umbrella.x, umbrella.width / 2, W - umbrella.width / 2);
 
@@ -137,47 +150,64 @@ function update() {
     if (d.y > H) Object.assign(d, newDrop());
   }
 
-  // Check coverage
-  const umbrellaLeft  = umbrella.x - umbrella.width / 2 - 10;
-  const umbrellaRight = umbrella.x + umbrella.width / 2 + 10;
-  const covered = coco.x > umbrellaLeft && coco.x < umbrellaRight;
+  // Coverage check
+  const covered = Math.abs(coco.x - umbrella.x) < umbrella.width / 2 + 10;
 
+  // Wet / dry
   if (covered) {
-    wetLevel = Math.max(0, wetLevel - 0.005);  // dry faster under umbrella
+    const dryRate = coco.poopState === 'pee' ? DRY_RATE_PEE : DRY_RATE;
+    wetLevel = Math.max(0, wetLevel - dryRate);
   } else {
-    wetLevel = Math.min(1, wetLevel + 0.010);
+    wetLevel = Math.min(1, wetLevel + WET_RATE);
   }
 
-  // Poop progress only during 'squat'
+  // Poop progress only during squat
   if (coco.poopState === 'squat') {
     if (wetLevel < 0.6) {
-      poopProgress = Math.min(1, poopProgress + 0.008);
+      poopProgress = Math.min(1, poopProgress + POOP_RATE);
+      if (poopProgress >= 1) {
+        // One poop done!
+        poopProgress = 0;
+        poopsLeft--;
+        coco.poopState = 'wander';
+        coco.actionTimer = 60;
+        // Confetti burst
+        for (let i = 0; i < 8; i++) {
+          coco.particles.push({
+            emoji: '💩', x: coco.x, y: coco.y + 10,
+            vy: -(2 + Math.random() * 3),
+            vx: (Math.random() - 0.5) * 4,
+            alpha: 1, size: 16 + Math.random() * 10,
+          });
+        }
+        if (poopsLeft <= 0) { endGame(true); return; }
+      }
     } else {
-      // Too wet → abort squat
+      // Too wet → abort
       coco.wetShake = 20;
       coco.poopState = 'wander';
       coco.actionTimer = 100;
-      poopProgress = Math.max(0, poopProgress - 0.05);
+      poopProgress = Math.max(0, poopProgress - 0.08);
     }
   }
-  // During 'pee': nothing happens to poop — just dry time
 
   if (wetLevel >= 1) { endGame(false); return; }
-  if (poopProgress >= 1) { endGame(true); return; }
 
   if (coco.wetShake > 0) coco.wetShake--;
 
   // Particles
   for (let i = coco.particles.length - 1; i >= 0; i--) {
     const p = coco.particles[i];
-    p.y += p.vy;
-    p.vy += 0.2;
-    p.alpha -= 0.02;
+    p.y  += p.vy;
+    p.x  += p.vx || 0;
+    p.vy += 0.15;
+    p.alpha -= 0.018;
     if (p.alpha <= 0) coco.particles.splice(i, 1);
   }
 
+  // UI
   poopBarEl.style.width = (poopProgress * 100) + '%';
-  wetBarEl.style.width = (wetLevel * 100) + '%';
+  wetBarEl.style.width  = (wetLevel * 100) + '%';
 }
 
 function updateCoco() {
@@ -185,40 +215,39 @@ function updateCoco() {
 
   if (coco.actionTimer <= 0) {
     if (coco.poopState === 'wander') {
-      // Decide next action: pee (40%), squat (30%), keep wandering (30%)
       const r = Math.random();
-      if (r < 0.30) {
-        coco.poopState = 'pee';
-        coco.actionTimer = 100 + Math.random() * 80;
+      if (r < 0.35) {
+        // おしっこタイム（乾かすチャンス）
+        coco.poopState  = 'pee';
+        coco.actionTimer = 120 + Math.random() * 100;
         coco.vx = 0;
       } else if (r < 0.75) {
-        coco.poopState = 'squat';
-        coco.actionTimer = 90 + Math.random() * 80;  // longer squat
+        // うんちタイム
+        coco.poopState  = 'squat';
+        coco.actionTimer = 100 + Math.random() * 80;
         coco.vx = 0;
       } else {
         pickNewTarget();
       }
     } else {
-      // After pee or squat → go back to wandering
-      coco.poopState = 'wander';
+      coco.poopState  = 'wander';
       pickNewTarget();
     }
   }
 
   if (coco.poopState === 'wander') {
     const dx = coco.wanderTarget - coco.x;
-    coco.vx = dx * 0.04;  // slower movement
-    coco.x += coco.vx;
+    coco.vx  = dx * 0.04;
+    coco.x  += coco.vx;
     if (Math.abs(dx) < 5 && coco.actionTimer > 20) pickNewTarget();
   } else {
     coco.vx *= 0.8;
-    coco.x += coco.vx;
-    // Emit particles
-    if (coco.poopState === 'squat' && Math.random() < 0.06 && poopProgress < 1) {
-      coco.particles.push({ emoji: '💩', x: coco.x, y: coco.y + 20, vy: -(1 + Math.random() * 1.5), alpha: 1, size: 12 + Math.random() * 8 });
+    coco.x  += coco.vx;
+    if (coco.poopState === 'squat' && Math.random() < 0.07) {
+      coco.particles.push({ emoji: '💩', x: coco.x, y: coco.y + 20, vy: -(1 + Math.random() * 1.5), vx: 0, alpha: 1, size: 12 + Math.random() * 8 });
     }
-    if (coco.poopState === 'pee' && Math.random() < 0.08) {
-      coco.particles.push({ emoji: '💦', x: coco.x + 20, y: coco.y + 16, vy: -(0.5 + Math.random()), alpha: 1, size: 10 + Math.random() * 6 });
+    if (coco.poopState === 'pee' && Math.random() < 0.10) {
+      coco.particles.push({ emoji: '💦', x: coco.x + 22, y: coco.y + 18, vy: -(0.4 + Math.random() * 0.8), vx: (Math.random() - 0.3) * 2, alpha: 1, size: 10 + Math.random() * 6 });
     }
   }
 
@@ -227,17 +256,19 @@ function updateCoco() {
 
 function pickNewTarget() {
   coco.wanderTarget = 60 + Math.random() * (W - 120);
-  coco.actionTimer = 80 + Math.random() * 80;
+  coco.actionTimer  = 70 + Math.random() * 80;
 }
 
 // ── Draw ─────────────────────────────────────────────────────
 function draw() {
+  // Sky
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, '#1c2a4a');
   sky.addColorStop(1, '#2a3a5a');
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
+  // Ground
   ctx.fillStyle = '#2d4a1e';
   ctx.fillRect(0, H * 0.78, W, H * 0.22);
   ctx.fillStyle = '#3a6127';
@@ -246,6 +277,7 @@ function draw() {
   drawPuddles();
   drawRain();
 
+  // Particles
   for (const p of coco.particles) {
     ctx.save();
     ctx.globalAlpha = p.alpha;
@@ -258,61 +290,67 @@ function draw() {
   drawCoco();
   drawUmbrella();
 
+  // Wet tint
   if (wetLevel > 0.3) {
     ctx.fillStyle = `rgba(100,180,255,${(wetLevel - 0.3) * 0.15})`;
     ctx.fillRect(0, 0, W, H);
   }
 
   // Status label above coco
-  const label = coco.poopState === 'squat' ? `💩 ${Math.floor(poopProgress * 100)}%`
-              : coco.poopState === 'pee'   ? '💦 おしっこ中...'
-              : null;
-  if (label) {
-    ctx.save();
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = coco.poopState === 'pee' ? '#7ecfff' : '#DEB887';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, coco.x, coco.y - 34);
-    ctx.restore();
+  if (coco.poopState === 'squat') {
+    drawLabel(coco.x, coco.y - 36, `💩 ${Math.floor(poopProgress * 100)}%`, '#DEB887');
+  } else if (coco.poopState === 'pee') {
+    drawLabel(coco.x, coco.y - 36, '💦 おしっこ中...', '#7ecfff');
+    // Dry hint when wet and covered
+    const covered = Math.abs(coco.x - umbrella.x) < umbrella.width / 2 + 10;
+    if (wetLevel > 0.2 && covered) {
+      drawLabel(coco.x, coco.y - 54, '☀ 乾かし中！', 'rgba(255,220,80,0.95)');
+    } else if (wetLevel > 0.2) {
+      drawLabel(coco.x, coco.y - 54, '⚠ 傘を持ってきて！', 'rgba(255,100,80,0.95)');
+    }
   }
 
-  // "乾かして！" hint when pee and wet
-  if (coco.poopState === 'pee' && wetLevel > 0.25) {
-    ctx.save();
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillStyle = 'rgba(255,220,100,0.9)';
-    ctx.textAlign = 'center';
-    ctx.fillText('☀ 乾かすチャンス！', coco.x, coco.y - 50);
-    ctx.restore();
-  }
+  // Poop counter top-center
+  drawPoopCounter();
+}
+
+function drawPoopCounter() {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(`うんち残り: ${'💩'.repeat(poopsLeft)}`, W / 2, H - 14);
+  ctx.restore();
+}
+
+function drawLabel(x, y, text, color) {
+  ctx.save();
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }
 
 function drawRain() {
   const ux = umbrella.x;
   const uy = umbrella.y;
-  const r = umbrella.width / 2;
+  const ur = umbrella.width / 2;
 
   ctx.save();
+  ctx.strokeStyle = 'rgba(174,214,241,0.6)';
   for (const d of drops) {
-    // Skip drops that are inside the umbrella canopy (semicircle above uy)
-    const dx = d.x - ux;
-    const dy = d.y - uy;
-    if (dy <= 0 && dx * dx + dy * dy < r * r) continue;
-    // Also clip the line endpoint if it would enter the canopy
-    let ex = d.x - 2;
-    let ey = d.y + d.len;
-    const edx = ex - ux;
-    const edy = ey - uy;
-    if (edy <= 0 && edx * edx + edy * edy < r * r) {
-      // Shorten the line so it stops at the umbrella edge
-      const t = Math.sqrt(r * r / (dx * dx + dy * dy || 1));
-      ex = ux + dx * t - 2;
-      ey = uy + dy * t;
-    }
-    ctx.strokeStyle = `rgba(174,214,241,${d.alpha})`;
+    // Skip drops horizontally under the umbrella canopy
+    if (d.x > ux - ur && d.x < ux + ur && d.y > uy) continue;
+
+    const alpha = d.alpha;
+    ctx.strokeStyle = `rgba(174,214,241,${alpha})`;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(d.x, d.y);
+    // Clip line endpoint if it enters the dry zone
+    let ex = d.x - 2, ey = d.y + d.len;
+    if (ex > ux - ur && ex < ux + ur && ey > uy) ey = uy;
     ctx.lineTo(ex, ey);
     ctx.stroke();
   }
@@ -333,7 +371,7 @@ function drawPuddles() {
 function drawUmbrella() {
   const ux = umbrella.x;
   const uy = umbrella.y;
-  const r = umbrella.width / 2;
+  const r  = umbrella.width / 2;
 
   ctx.save();
 
@@ -390,7 +428,7 @@ function drawCoco() {
   const cy = coco.y;
   const squatting = coco.poopState === 'squat';
   const peeing    = coco.poopState === 'pee';
-  const facing = coco.vx >= 0 ? 1 : -1;
+  const facing    = coco.vx >= 0 ? 1 : -1;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -400,25 +438,21 @@ function drawCoco() {
   const bodyW = 54;
   const bodyY = squatting ? 6 : 0;
 
-  // Body
   ctx.fillStyle = '#c8a46e';
   ctx.beginPath();
   ctx.ellipse(0, bodyY, bodyW / 2, bodyH / 2, squatting ? 0.2 : 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Head
   ctx.fillStyle = '#c8a46e';
   ctx.beginPath();
   ctx.ellipse(22, bodyY - 14, 16, 14, 0.1, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ear
   ctx.fillStyle = '#a0784a';
   ctx.beginPath();
   ctx.ellipse(28, bodyY - 22, 7, 10, 0.4, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eye
   ctx.fillStyle = '#2c1a00';
   ctx.beginPath();
   ctx.arc(26, bodyY - 16, 2.5, 0, Math.PI * 2);
@@ -428,13 +462,11 @@ function drawCoco() {
   ctx.arc(27, bodyY - 17, 1, 0, Math.PI * 2);
   ctx.fill();
 
-  // Nose
   ctx.fillStyle = '#2c1a00';
   ctx.beginPath();
   ctx.ellipse(33, bodyY - 13, 3, 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Legs
   ctx.fillStyle = '#b8945e';
   const legY = bodyY + bodyH / 2 - 4;
   if (squatting) {
@@ -446,7 +478,6 @@ function drawCoco() {
     ctx.ellipse(-26, legY + 5, 14, 10, 0.3, 0, Math.PI * 2);
     ctx.fill();
   } else if (peeing) {
-    // Leg lifted for pee
     ctx.fillRect(-22, legY, 10, 14);
     ctx.fillRect(-5,  legY, 10, 14);
     ctx.save();
@@ -461,21 +492,17 @@ function drawCoco() {
     ctx.fillRect(8,   legY + legSwing, 10, 16);
   }
 
-  // Tail
   ctx.strokeStyle = '#c8a46e';
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-bodyW / 2 + 4, bodyY);
   ctx.quadraticCurveTo(
-    -bodyW / 2 - 14,
-    bodyY - (squatting ? 8 : 18),
-    -bodyW / 2 - 6,
-    bodyY - (squatting ? 20 : 32)
+    -bodyW / 2 - 14, bodyY - (squatting ? 8 : 18),
+    -bodyW / 2 - 6,  bodyY - (squatting ? 20 : 32)
   );
   ctx.stroke();
 
-  // Wet drops
   if (wetLevel > 0.2) {
     ctx.font = '10px serif';
     ctx.textAlign = 'center';
