@@ -12,9 +12,9 @@ const startBtn     = document.getElementById('start-btn');
 
 // ── Constants ────────────────────────────────────────────────
 const POOPS_TO_WIN = 4;
-const WET_RATE     = 0.026;  // 傘なし：かなり速く濡れる
-const DRY_RATE     = 0.004;  // 通常乾燥
-const DRY_RATE_PEE = 0.016;  // おしっこ中乾燥（速い）
+const WET_RATE     = 0.012;  // 傘なし：かなり速く濡れる
+const DRY_RATE     = 0.003;  // 通常乾燥
+const DRY_RATE_PEE = 0.022;  // おしっこ中乾燥（速い）
 const POOP_RATE    = 0.010;
 
 // ── State ────────────────────────────────────────────────────
@@ -369,7 +369,7 @@ function draw() {
   // Labels
   const isPooping = coco.poopState === 'squat' || coco.poopState === 'walk-poop';
   if (isPooping) {
-    const label = coco.poopState === 'walk-poop' ? `💩 歩きながら… ${Math.floor(poopProgress*100)}%` : `💩 ${Math.floor(poopProgress*100)}%`;
+    const label = `💩 ${Math.floor(poopProgress*100)}%`;
     drawLabel(coco.x, coco.y - 38, label, '#DEB887');
   } else if (coco.poopState === 'pee') {
     drawLabel(coco.x, coco.y - 36, '💦 おしっこ中...', '#7ecfff');
