@@ -12,8 +12,8 @@ const startBtn     = document.getElementById('start-btn');
 
 // ── Constants ────────────────────────────────────────────────
 const POOPS_TO_WIN = 4;
-const WET_RATE     = 0.012;  // 傘なし：かなり速く濡れる
-const DRY_RATE     = 0.003;  // 通常乾燥
+const WET_RATE     = 0.006;  // 傘なし：かなり速く濡れる
+const DRY_RATE     = 0.0008;  // 通常乾燥
 const DRY_RATE_PEE = 0.022;  // おしっこ中乾燥（速い）
 const POOP_RATE    = 0.010;
 
@@ -263,7 +263,7 @@ function updateCoco() {
   if (coco.actionTimer <= 0) {
     if (coco.poopState === 'wander') {
       const r = Math.random();
-      if (r < 0.30) {
+      if (r < 0.48) {
         coco.poopState   = 'pee';
         coco.actionTimer = 120 + Math.random() * 100;
         coco.vx = 0;
