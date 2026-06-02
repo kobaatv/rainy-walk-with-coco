@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ココのうんちタイム☔</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    #game-container {
+      position: relative;
+      width: 480px;
+      height: 640px;
+      overflow: hidden;
+      border-radius: 16px;
+      box-shadow: 0 0 40px rgba(100,150,255,0.3);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #ui {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+    .poop-bar-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .poop-label {
+      color: #fff;
+      font-size: 11px;
+      font-weight: bold;
+      text-shadow: 0 1px 3px #000;
+      letter-spacing: 0.5px;
+    }
+    #poop-bar-bg {
+      width: 140px;
+      height: 18px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 9px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    #poop-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #8B4513, #D2691E, #DEB887);
+      border-radius: 9px;
+      transition: width 0.1s linear;
+    }
+    #wet-bar-bg {
+      width: 100px;
+      height: 14px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 7px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    #wet-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4fc3f7, #0288d1);
+      border-radius: 7px;
+      transition: width 0.1s linear;
+    }
+    .wet-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.7);
+      border-radius: 16px;
+      gap: 16px;
+    }
+    #overlay h1 {
+      color: #fff;
+      font-size: 28px;
+      text-align: center;
+      line-height: 1.4;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+    #overlay p {
+      color: #ccc;
+      font-size: 14px;
+      text-align: center;
+      max-width: 300px;
+      line-height: 1.6;
+    }
+    #start-btn {
+      padding: 14px 40px;
+      font-size: 18px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(102,126,234,0.5);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    #start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 25px rgba(102,126,234,0.7);
+    }
+    #start-btn:active { transform: scale(0.97); }
+    #hint {
+      position: absolute;
+      bottom: 12px;
+      left: 0; right: 0;
+      text-align: center;
+      color: rgba(255,255,255,0.5);
+      font-size: 12px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="game-container">
+  <canvas id="canvas" width="480" height="640"></canvas>
+  <div id="ui">
+    <div class="poop-bar-wrap">
+      <div class="poop-label">💩 うんちゲージ</div>
+      <div id="poop-bar-bg"><div id="poop-bar"></div></div>
+    </div>
+    <div class="wet-wrap">
+      <div class="poop-label">💧 ぬれぐあい</div>
+      <div id="wet-bar-bg"><div id="wet-bar"></div></div>
+    </div>
+  </div>
+  <div id="overlay">
+    <h1 id="overlay-title">☔ ココのうんちタイム</h1>
+    <p id="overlay-msg">雨の中、ここはどうしてもうんちがしたい！<br>傘を左右に動かしてぬれないようにしてあげよう。<br><br>← → キー または 画面タップ で操作</p>
+    <button id="start-btn">スタート！</button>
+  </div>
+  <div id="hint">← → キー / 画面左右タップ</div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
