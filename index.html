@@ -131,23 +131,7 @@
     }
     #start-btn:active { transform: scale(0.97); }
 
-    /* スマホ用左右ボタン（プレイ中のみ表示） */
-    #touch-controls {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 100%;
-      pointer-events: none;
-    }
-    #touch-controls.active { pointer-events: auto; }
-    .touch-btn {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 50%;
-      opacity: 0;
-    }
-    #btn-left  { left: 0; }
-    #btn-right { right: 0; }
+    /* タッチ操作はcanvas直接で処理するためdiv不要 */
 
     #hint {
       position: absolute;
@@ -172,12 +156,6 @@
       <div class="poop-label">💧 ぬれぐあい</div>
       <div id="wet-bar-bg"><div id="wet-bar"></div></div>
     </div>
-  </div>
-
-  <!-- スマホ用透明タッチゾーン -->
-  <div id="touch-controls">
-    <div class="touch-btn" id="btn-left"></div>
-    <div class="touch-btn" id="btn-right"></div>
   </div>
 
   <div id="overlay">

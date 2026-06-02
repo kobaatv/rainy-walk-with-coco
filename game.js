@@ -59,22 +59,38 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-const touchControls = document.getElementById('touch-controls');
-const btnLeft  = document.getElementById('btn-left');
-const btnRight = document.getElementById('btn-right');
-
-function setTouchActive(active) {
-  touchControls.classList.toggle('active', active);
-}
-
-btnLeft.addEventListener('touchstart',  e => { umbrella.moving = -1; e.preventDefault(); }, { passive: false });
-btnLeft.addEventListener('touchend',    e => { umbrella.moving = 0;  e.preventDefault(); }, { passive: false });
-btnRight.addEventListener('touchstart', e => { umbrella.moving =  1; e.preventDefault(); }, { passive: false });
-btnRight.addEventListener('touchend',   e => { umbrella.moving = 0;  e.preventDefault(); }, { passive: false });
+// canvas直接タッチ: 左半分=左移動、右半分=右移動
+function setTouchActive(_a) {}
 
 let touchStartX = null;
-canvas.addEventListener('touchstart', e => { if (state === 'playing') touchStartX = e.touches[0].clientX; }, { passive: true });
-canvas.addEventListener('touchend', () => { touchStartX = null; });
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (state !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const tx = e.touches[0].clientX - rect.left;
+  touchStartX = tx;
+  umbrella.moving = tx < rect.width / 2 ? -1 : 1;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (state !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const tx = e.touches[0].clientX - rect.left;
+  umbrella.moving = tx < rect.width / 2 ? -1 : 1;
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  umbrella.moving = 0;
+  touchStartX = null;
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', () => {
+  umbrella.moving = 0;
+  touchStartX = null;
+});
 
 startBtn.addEventListener('click', startGame);
 
@@ -138,7 +154,7 @@ function update() {
 
   if (keys['ArrowLeft'])       umbrella.moving = -1;
   else if (keys['ArrowRight']) umbrella.moving =  1;
-  else if (!touchStartX)       umbrella.moving =  0;
+  else if (!keys['ArrowLeft'] && !keys['ArrowRight'] && touchStartX === null) umbrella.moving = 0;
   umbrella.x += umbrella.moving * umbrella.speed;
   umbrella.x = clamp(umbrella.x, umbrella.width / 2, W - umbrella.width / 2);
 
