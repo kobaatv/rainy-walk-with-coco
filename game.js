@@ -28,8 +28,6 @@ function toGameX(clientX) {
   return (clientX - rect.left) / rect.width * W;
 }
 
-const poopBarEl    = document.getElementById('poop-bar');
-const wetBarEl     = document.getElementById('wet-bar');
 const overlay      = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayMsg   = document.getElementById('overlay-msg');
@@ -257,11 +255,6 @@ function update() {
     if (p.alpha <= 0) coco.particles.splice(i, 1);
   }
 
-  poopBarEl.style.width = (poopProgress * 100) + '%';
-  wetBarEl.style.width  = (wetLevel * 100) + '%';
-  wetBarEl.style.background = wetLevel > 0.7
-    ? 'linear-gradient(90deg, #e53935, #ff1744)'
-    : 'linear-gradient(90deg, #4fc3f7, #0288d1)';
 }
 
 function updateCoco() {
@@ -467,6 +460,86 @@ function drawUmbrella() {
   ctx.fillStyle = '#fff';
   ctx.beginPath(); ctx.arc(ux, uy - r*0.02, 5, 0, Math.PI*2); ctx.fill();
   ctx.restore();
+
+  // ── 傘の柄の下にインジケーター ──
+  drawIndicators(ux, H * 0.79 + 16);
+}
+
+function drawIndicators(cx, topY) {
+  const barW  = 120;
+  const barH  = 10;
+  const gap   = 18;
+  const left  = cx - barW / 2;
+
+  ctx.save();
+
+  // 背景シャドウ
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur  = 4;
+
+  // うんちゲージ
+  const py = topY;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  roundRect(left, py, barW, barH, barH / 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  if (poopProgress > 0) {
+    const grad = ctx.createLinearGradient(left, 0, left + barW, 0);
+    grad.addColorStop(0, '#8B4513');
+    grad.addColorStop(0.5, '#D2691E');
+    grad.addColorStop(1, '#DEB887');
+    ctx.fillStyle = grad;
+    roundRect(left, py, barW * poopProgress, barH, barH / 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  roundRect(left, py, barW, barH, barH / 2);
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.shadowBlur = 3; ctx.shadowColor = '#000';
+  ctx.fillText('💩', left - 14, py + barH - 1);
+  ctx.shadowBlur = 0;
+
+  // ぬれぐあい
+  const wy = topY + gap;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  roundRect(left, wy, barW, barH, barH / 2);
+  ctx.fill();
+  if (wetLevel > 0) {
+    const wcolor = wetLevel > 0.7 ? ['#e53935','#ff1744'] : ['#4fc3f7','#0288d1'];
+    const wg = ctx.createLinearGradient(left, 0, left + barW, 0);
+    wg.addColorStop(0, wcolor[0]); wg.addColorStop(1, wcolor[1]);
+    ctx.fillStyle = wg;
+    roundRect(left, wy, barW * wetLevel, barH, barH / 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  roundRect(left, wy, barW, barH, barH / 2);
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.shadowBlur = 3; ctx.shadowColor = '#000';
+  ctx.fillText('💧', left - 14, wy + barH - 1);
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 function drawCoco() {
