@@ -16,7 +16,6 @@
       font-family: 'Segoe UI', sans-serif;
       overflow: hidden;
       user-select: none;
-      touch-action: none;
     }
     #game-container {
       position: relative;
@@ -29,8 +28,8 @@
     }
     canvas {
       display: block;
-      /* JS が aspect-ratio を維持しながら CSS サイズをセットする */
       cursor: grab;
+      touch-action: none;
     }
     canvas:active { cursor: grabbing; }
     #overlay {
