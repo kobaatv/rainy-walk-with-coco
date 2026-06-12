@@ -22,13 +22,17 @@
       position: relative;
       width: 100vw;
       height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       overflow: hidden;
     }
     canvas {
       display: block;
-      width: 100%;
-      height: 100%;
+      /* JS が aspect-ratio を維持しながら CSS サイズをセットする */
+      cursor: grab;
     }
+    canvas:active { cursor: grabbing; }
     #ui {
       position: absolute;
       top: 0; left: 0; right: 0;

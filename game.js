@@ -1,20 +1,28 @@
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 
-// W/H always reflect current canvas size
-const W = () => canvas.width;
-const H = () => canvas.height;
+// ── 内部解像度固定 ────────────────────────────────────────────
+const W = 480;
+const H = 640;
+canvas.width  = W;
+canvas.height = H;
 
+// CSS サイズだけ変えてアスペクト比を維持しながら画面にフィット
 function resizeCanvas() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-  // Keep umbrella and coco at correct proportional positions
-  umbrella.y = canvas.height * 0.32;
-  coco.y     = canvas.height * 0.65;
-  umbrella.x = clamp(umbrella.x, umbrella.width / 2, canvas.width - umbrella.width / 2);
-  coco.x     = clamp(coco.x, 40, canvas.width - 40);
+  const scaleW = window.innerWidth  / W;
+  const scaleH = window.innerHeight / H;
+  const scale  = Math.min(scaleW, scaleH);
+  canvas.style.width  = Math.floor(W * scale) + 'px';
+  canvas.style.height = Math.floor(H * scale) + 'px';
 }
+resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
+
+// スクリーン座標 → ゲーム内座標
+function toGameX(clientX) {
+  const rect = canvas.getBoundingClientRect();
+  return (clientX - rect.left) / rect.width * W;
+}
 
 const poopBarEl    = document.getElementById('poop-bar');
 const wetBarEl     = document.getElementById('wet-bar');
@@ -40,8 +48,8 @@ let splashes     = [];
 
 // ── Umbrella ───────────────────────────────────────────────────
 const umbrella = {
-  x: 300,
-  y: 200,
+  x: W / 2,
+  y: H * 0.32,
   width: 155,
   speed: 7,
   moving: 0,
@@ -50,22 +58,19 @@ const umbrella = {
 // ── Coco ───────────────────────────────────────────────────────
 // poopState: 'wander' | 'pee' | 'squat' | 'walk-poop'
 const coco = {
-  x: 300,
-  y: 400,
+  x: W / 2,
+  y: H * 0.65,
   vx: 0,
   poopState: 'wander',
   actionTimer: 80,
-  wanderTarget: 300,
+  wanderTarget: W / 2,
   wetShake: 0,
   particles: [],
   drips: [],
 };
 
 const drops = [];
-const DROP_COUNT = 220;
-
-// Init canvas size before first use
-resizeCanvas();
+const DROP_COUNT = 200;
 
 // ── Input ──────────────────────────────────────────────────────
 const keys = {};
@@ -75,34 +80,42 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-let touchActive = false;
+// --- Touch: follow finger X ---
+let pointerActive = false;
+
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   if (state !== 'playing') return;
-  const rect = canvas.getBoundingClientRect();
-  const tx = e.touches[0].clientX - rect.left;
-  touchActive = true;
-  umbrella.moving = tx < rect.width / 2 ? -1 : 1;
+  pointerActive = true;
+  umbrella.x = clamp(toGameX(e.touches[0].clientX), umbrella.width / 2, W - umbrella.width / 2);
+  umbrella.moving = 0;
 }, { passive: false });
 
 canvas.addEventListener('touchmove', e => {
   e.preventDefault();
   if (state !== 'playing') return;
-  const rect = canvas.getBoundingClientRect();
-  const tx = e.touches[0].clientX - rect.left;
-  umbrella.moving = tx < rect.width / 2 ? -1 : 1;
+  umbrella.x = clamp(toGameX(e.touches[0].clientX), umbrella.width / 2, W - umbrella.width / 2);
 }, { passive: false });
 
-canvas.addEventListener('touchend', e => {
-  e.preventDefault();
-  umbrella.moving = 0;
-  touchActive = false;
-}, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); pointerActive = false; }, { passive: false });
+canvas.addEventListener('touchcancel',() => { pointerActive = false; });
 
-canvas.addEventListener('touchcancel', () => {
+// --- Mouse drag: follow cursor X ---
+let mouseDragging = false;
+
+canvas.addEventListener('mousedown', e => {
+  if (state !== 'playing') return;
+  mouseDragging = true;
+  umbrella.x = clamp(toGameX(e.clientX), umbrella.width / 2, W - umbrella.width / 2);
   umbrella.moving = 0;
-  touchActive = false;
 });
+
+window.addEventListener('mousemove', e => {
+  if (!mouseDragging || state !== 'playing') return;
+  umbrella.x = clamp(toGameX(e.clientX), umbrella.width / 2, W - umbrella.width / 2);
+});
+
+window.addEventListener('mouseup', () => { mouseDragging = false; });
 
 startBtn.addEventListener('click', startGame);
 
@@ -115,8 +128,8 @@ function initRain() {
 
 function newDrop(randomY = false) {
   return {
-    x: Math.random() * W(),
-    y: randomY ? Math.random() * H() : -10,
+    x: Math.random() * W,
+    y: randomY ? Math.random() * H : -10,
     len: 10 + Math.random() * 14,
     speed: 9 + Math.random() * 7,
     alpha: 0.35 + Math.random() * 0.5,
@@ -130,12 +143,12 @@ function startGame() {
   poopProgress = 0;
   poopsLeft    = POOPS_TO_WIN;
   wetLevel     = 0;
-  umbrella.x   = W() / 2;
+  umbrella.x   = W / 2;
   umbrella.moving = 0;
-  coco.x = W() / 2; coco.vx = 0;
+  coco.x = W / 2; coco.vx = 0;
   coco.poopState   = 'wander';
   coco.actionTimer = 80;
-  coco.wanderTarget = W() / 2;
+  coco.wanderTarget = W / 2;
   coco.wetShake   = 0;
   coco.particles  = [];
   coco.drips      = [];
@@ -150,10 +163,10 @@ function endGame(won) {
   overlay.style.display = 'flex';
   if (won) {
     overlayTitle.textContent = '🎉 ミッション完了！';
-    overlayMsg.textContent = `${POOPS_TO_WIN}回全部うんちできたね！\n完璧な傘さしでした 💩✨`;
+    overlayMsg.textContent   = `${POOPS_TO_WIN}回全部うんちできたね！\n完璧な傘さしでした 💩✨`;
   } else {
     overlayTitle.textContent = '💧 ぬれすぎた！';
-    overlayMsg.textContent = 'びしょ濡れでうんちどころじゃない！\nおしっこ中に傘の下で乾かしておこう！';
+    overlayMsg.textContent   = 'びしょ濡れでうんちどころじゃない！\nおしっこ中に傘の下で乾かしておこう！';
   }
   startBtn.textContent = 'もう一回！';
 }
@@ -162,21 +175,24 @@ function endGame(won) {
 function update() {
   if (state !== 'playing') return;
 
-  if (keys['ArrowLeft'])       umbrella.moving = -1;
-  else if (keys['ArrowRight']) umbrella.moving =  1;
-  else if (!touchActive)       umbrella.moving =  0;
-  umbrella.x += umbrella.moving * umbrella.speed;
-  umbrella.x = clamp(umbrella.x, umbrella.width / 2, W() - umbrella.width / 2);
+  // キーボードのみ moving を使う。タッチ・マウスは直接 x を更新済み
+  if (!pointerActive && !mouseDragging) {
+    if (keys['ArrowLeft'])       umbrella.moving = -1;
+    else if (keys['ArrowRight']) umbrella.moving =  1;
+    else                         umbrella.moving =  0;
+    umbrella.x += umbrella.moving * umbrella.speed;
+    umbrella.x = clamp(umbrella.x, umbrella.width / 2, W - umbrella.width / 2);
+  }
 
   updateCoco();
 
   const ux = umbrella.x, uy = umbrella.y, ur = umbrella.width / 2;
   for (const d of drops) {
     d.y += d.speed;
-    if (d.y > H()) {
+    if (d.y > H) {
       Object.assign(d, newDrop());
-    } else if (d.y > H() * 0.78 && d.y < H() * 0.78 + d.speed + 2) {
-      if (Math.random() < 0.3) splashes.push({ x: d.x, y: H() * 0.78, r: 0, alpha: 0.7 });
+    } else if (d.y > H * 0.78 && d.y < H * 0.78 + d.speed + 2) {
+      if (Math.random() < 0.3) splashes.push({ x: d.x, y: H * 0.78, r: 0, alpha: 0.7 });
     }
     if (d.x > ux - ur && d.x < ux + ur && Math.abs(d.y - uy) < d.speed + 2) {
       if (Math.random() < 0.4) splashes.push({ x: d.x, y: uy, r: 0, alpha: 0.5 });
@@ -190,11 +206,9 @@ function update() {
   }
 
   const covered = Math.abs(coco.x - umbrella.x) < umbrella.width / 2 + 8;
-  if (covered) {
-    wetLevel = Math.max(0, wetLevel - (coco.poopState === 'pee' ? DRY_RATE_PEE : DRY_RATE));
-  } else {
-    wetLevel = Math.min(1, wetLevel + WET_RATE);
-  }
+  wetLevel = covered
+    ? Math.max(0, wetLevel - (coco.poopState === 'pee' ? DRY_RATE_PEE : DRY_RATE))
+    : Math.min(1, wetLevel + WET_RATE);
 
   if (!covered && wetLevel > 0.3 && Math.random() < 0.08) {
     coco.drips.push({ ox: (Math.random() - 0.5) * 40, oy: -10, dy: 0, alpha: 0.9 });
@@ -217,7 +231,8 @@ function update() {
         coco.actionTimer = 60;
         for (let i = 0; i < 8; i++) {
           coco.particles.push({ emoji: '💩', x: coco.x, y: coco.y + 10,
-            vy: -(2 + Math.random() * 3), vx: (Math.random() - 0.5) * 4, alpha: 1, size: 16 + Math.random() * 10 });
+            vy: -(2 + Math.random() * 3), vx: (Math.random() - 0.5) * 4,
+            alpha: 1, size: 16 + Math.random() * 10 });
         }
         if (poopsLeft <= 0) { endGame(true); return; }
       }
@@ -287,31 +302,29 @@ function updateCoco() {
         vy: -(0.4 + Math.random() * 0.8), vx: (Math.random() - 0.3) * 2, alpha: 1, size: 10 + Math.random() * 6 });
     }
   }
-  coco.x = clamp(coco.x, 40, W() - 40);
+  coco.x = clamp(coco.x, 40, W - 40);
 }
 
 function pickNewTarget() {
-  coco.wanderTarget = 60 + Math.random() * (W() - 120);
+  coco.wanderTarget = 60 + Math.random() * (W - 120);
   coco.actionTimer  = 70 + Math.random() * 80;
 }
 
 // ── Draw ───────────────────────────────────────────────────────
 function draw() {
-  const w = W(), h = H();
-
   const wetTint = wetLevel * 0.3;
-  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, `rgb(${Math.round(28 - wetTint*10)},${Math.round(42 + wetTint*8)},${Math.round(74 + wetTint*20)})`);
   sky.addColorStop(1, '#2a3a5a');
   ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = wetLevel > 0.4 ? '#1e3312' : '#2d4a1e';
-  ctx.fillRect(0, h * 0.78, w, h * 0.22);
+  ctx.fillRect(0, H * 0.78, W, H * 0.22);
   ctx.fillStyle = '#3a6127';
-  ctx.fillRect(0, h * 0.78, w, 6);
+  ctx.fillRect(0, H * 0.78, W, 6);
 
-  drawPuddles(w, h);
+  drawPuddles();
   drawSplashes();
   drawRain();
 
@@ -325,18 +338,18 @@ function draw() {
   }
 
   drawCoco();
-  drawUmbrella(h);
+  drawUmbrella();
 
   if (wetLevel > 0.25) {
-    const vign = ctx.createRadialGradient(w/2, h/2, h*0.2, w/2, h/2, h*0.85);
+    const vign = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.85);
     vign.addColorStop(0, 'rgba(0,0,0,0)');
     vign.addColorStop(1, `rgba(30,100,220,${(wetLevel - 0.25) * 0.55})`);
     ctx.fillStyle = vign;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, W, H);
   }
   if (wetLevel > 0.8 && Math.sin(Date.now() * 0.015) > 0.5) {
     ctx.fillStyle = `rgba(30,80,200,${(wetLevel - 0.8) * 0.18})`;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, W, H);
   }
 
   const isPooping = coco.poopState === 'squat' || coco.poopState === 'walk-poop';
@@ -352,12 +365,11 @@ function draw() {
     }
   }
 
-  // Poop counter
   ctx.save();
   ctx.textAlign = 'center';
   ctx.font = 'bold 14px sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText(`うんち残り: ${'💩'.repeat(poopsLeft)}`, w / 2, h - 14);
+  ctx.fillText(`うんち残り: ${'💩'.repeat(poopsLeft)}`, W / 2, H - 14);
   ctx.restore();
 }
 
@@ -399,34 +411,32 @@ function drawSplashes() {
   ctx.restore();
 }
 
-function drawPuddles(w, h) {
+function drawPuddles() {
   const grow = 1 + wetLevel * 0.8;
   ctx.save();
   ctx.fillStyle = `rgba(100,160,220,${0.2 + wetLevel * 0.25})`;
-  const bases = [[0.12,0.79,80,8],[0.46,0.81,55,6],[0.73,0.80,70,7]];
-  for (const [rx, ry, pw, ph] of bases) {
+  for (const [rx, ry, pw, ph] of [[0.12,0.79,80,8],[0.46,0.81,55,6],[0.73,0.80,70,7]]) {
     ctx.beginPath();
-    ctx.ellipse(w * rx, h * ry, pw * grow, ph * grow, 0, 0, Math.PI * 2);
+    ctx.ellipse(W * rx, H * ry, pw * grow, ph * grow, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-function drawUmbrella(h) {
+function drawUmbrella() {
   const ux = umbrella.x, uy = umbrella.y, r = umbrella.width / 2;
   ctx.save();
 
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath();
-  ctx.ellipse(ux, h * 0.79, r * 0.8, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(ux, H * 0.79, r * 0.8, 10, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = '#6d4c41';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
+  ctx.lineWidth = 5; ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(ux, uy + 10);
-  ctx.lineTo(ux, h * 0.79);
+  ctx.lineTo(ux, H * 0.79);
   ctx.stroke();
 
   const gradient = ctx.createRadialGradient(ux, uy, 5, ux, uy, r);
@@ -436,9 +446,8 @@ function drawUmbrella(h) {
   ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(ux, uy, r, Math.PI, 0);
-  const segments = 10;
-  const segW = (r * 2) / segments;
-  for (let i = 0; i < segments; i++) {
+  const segW = (r * 2) / 10;
+  for (let i = 0; i < 10; i++) {
     const sx = (ux - r) + i * segW;
     ctx.arc(sx + segW / 2, uy, segW / 2, 0, Math.PI);
   }
@@ -447,14 +456,12 @@ function drawUmbrella(h) {
 
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.beginPath();
-  ctx.arc(ux - r * 0.2, uy - r * 0.15, r * 0.45, Math.PI + 0.3, Math.PI * 2 - 0.3);
+  ctx.arc(ux - r*0.2, uy - r*0.15, r*0.45, Math.PI+0.3, Math.PI*2-0.3);
   ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(ux, uy - r * 0.02, 5, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(ux, uy - r*0.02, 5, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -484,14 +491,10 @@ function drawCoco() {
   ctx.fill();
 
   ctx.fillStyle = '#c8a46e';
-  ctx.beginPath();
-  ctx.ellipse(22, bodyY-14, 16, 14, 0.1, 0, Math.PI*2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(22, bodyY-14, 16, 14, 0.1, 0, Math.PI*2); ctx.fill();
 
   ctx.fillStyle = '#a0784a';
-  ctx.beginPath();
-  ctx.ellipse(28, bodyY-22, 7, 10, 0.4, 0, Math.PI*2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(28, bodyY-22, 7, 10, 0.4, 0, Math.PI*2); ctx.fill();
 
   ctx.fillStyle = '#2c1a00';
   ctx.beginPath(); ctx.arc(26, bodyY-16, 2.5, 0, Math.PI*2); ctx.fill();
@@ -504,30 +507,20 @@ function drawCoco() {
   ctx.fillStyle = '#b8945e';
   const legY = bodyY + bodyH/2 - 4;
   if (squatting) {
-    ctx.fillRect(-22, legY, 10, 14);
-    ctx.fillRect(-5,  legY, 10, 14);
-    ctx.fillRect(8,   legY, 10, 14);
+    ctx.fillRect(-22, legY, 10, 14); ctx.fillRect(-5, legY, 10, 14); ctx.fillRect(8, legY, 10, 14);
     ctx.fillStyle = '#c8a46e';
     ctx.beginPath(); ctx.ellipse(-26, legY+5, 14, 10, 0.3, 0, Math.PI*2); ctx.fill();
   } else if (walkPooping) {
     const ls = Math.sin(Date.now() * 0.012) * 4;
-    ctx.fillRect(-22, legY+ls+3, 10, 14);
-    ctx.fillRect(-5,  legY-ls+3, 10, 14);
-    ctx.fillRect(8,   legY+ls+3, 10, 14);
+    ctx.fillRect(-22, legY+ls+3, 10, 14); ctx.fillRect(-5, legY-ls+3, 10, 14); ctx.fillRect(8, legY+ls+3, 10, 14);
     ctx.fillStyle = '#c8a46e';
     ctx.beginPath(); ctx.ellipse(-24, legY+8, 12, 8, 0.3, 0, Math.PI*2); ctx.fill();
   } else if (peeing) {
-    ctx.fillRect(-22, legY, 10, 14);
-    ctx.fillRect(-5,  legY, 10, 14);
-    ctx.save();
-    ctx.translate(24, legY+7); ctx.rotate(-0.7);
-    ctx.fillRect(-5, -5, 10, 14);
-    ctx.restore();
+    ctx.fillRect(-22, legY, 10, 14); ctx.fillRect(-5, legY, 10, 14);
+    ctx.save(); ctx.translate(24, legY+7); ctx.rotate(-0.7); ctx.fillRect(-5,-5,10,14); ctx.restore();
   } else {
     const ls = Math.sin(Date.now() * 0.012) * 5;
-    ctx.fillRect(-22, legY+ls, 10, 16);
-    ctx.fillRect(-5,  legY-ls, 10, 16);
-    ctx.fillRect(8,   legY+ls, 10, 16);
+    ctx.fillRect(-22, legY+ls, 10, 16); ctx.fillRect(-5, legY-ls, 10, 16); ctx.fillRect(8, legY+ls, 10, 16);
   }
 
   ctx.strokeStyle = '#c8a46e';
@@ -538,7 +531,6 @@ function drawCoco() {
   ctx.stroke();
 
   ctx.filter = 'none';
-
   ctx.fillStyle = 'rgba(140,200,255,0.85)';
   for (const d of coco.drips) {
     ctx.globalAlpha = d.alpha;
