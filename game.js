@@ -1,19 +1,23 @@
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 
-// ── 内部解像度固定 ────────────────────────────────────────────
+// ── 解像度設定 ────────────────────────────────────────────────
 const W = 480;
 const H = 640;
-canvas.width  = W;
-canvas.height = H;
 
-// CSS サイズだけ変えてアスペクト比を維持しながら画面にフィット
+// CSS サイズはアスペクト比維持でフィット、canvas ピクセルは DPR 倍にしてシャープに
 function resizeCanvas() {
+  const dpr    = window.devicePixelRatio || 1;
   const scaleW = window.innerWidth  / W;
   const scaleH = window.innerHeight / H;
   const scale  = Math.min(scaleW, scaleH);
-  canvas.style.width  = Math.floor(W * scale) + 'px';
-  canvas.style.height = Math.floor(H * scale) + 'px';
+  const cssW   = Math.floor(W * scale);
+  const cssH   = Math.floor(H * scale);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+  ctx.setTransform(cssW * dpr / W, 0, 0, cssH * dpr / H, 0, 0);
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
