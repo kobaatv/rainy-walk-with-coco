@@ -555,11 +555,12 @@ function drawCoco() {
   const walking    = coco.poopState === 'wander' || walkPooping;
   const legSwing   = walking ? Math.sin(Date.now() * 0.012) * 5 : 0;
 
-  // 絵本パレット
-  const CREAM   = '#f3e0c0';  // 体
-  const CREAM_D = '#e2c69a';  // 影・耳
-  const LINE    = '#8a6a48';  // やわらかい輪郭線
-  const BLUSH   = 'rgba(255,150,140,0.45)';
+  // トイプードル・パレット（アプリコット）
+  const COAT    = '#e8b98a';  // 毛色
+  const COAT_D  = '#d19f6d';  // 影・耳
+  const COAT_L  = '#f5d3ae';  // ハイライト
+  const LINE    = '#9a6f45';  // やわらかい輪郭線
+  const BLUSH   = 'rgba(255,140,130,0.45)';
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -576,99 +577,100 @@ function drawCoco() {
   const bodyW = 52;
   const bodyH = (lowered ? 30 : 36) + breathe;
 
-  // ── しっぽ（ふさふさ・ゆらゆら） ──
+  // もこもこ雲ブロブ（プードルカール）を描くヘルパー
+  function fluffBlob(x, y, rx, ry, lobes, fill, stroke) {
+    ctx.fillStyle = fill;
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2.5; }
+    ctx.beginPath();
+    for (let i = 0; i <= lobes; i++) {
+      const a  = (i / lobes) * Math.PI * 2;
+      const lr = 1 + 0.13 * Math.sin(a * lobes / 2 + t);  // ぽこぽこ
+      const px = x + Math.cos(a) * rx * lr;
+      const py = y + Math.sin(a) * ry * lr;
+      if (i === 0) ctx.moveTo(px, py);
+      else {
+        const am = a - Math.PI / lobes;
+        ctx.quadraticCurveTo(
+          x + Math.cos(am) * rx * 1.22,
+          y + Math.sin(am) * ry * 1.22,
+          px, py
+        );
+      }
+    }
+    ctx.closePath();
+    ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  // ── ポンポンしっぽ（ゆらゆら） ──
   const wag = Math.sin(Date.now() * (walking ? 0.02 : 0.008)) * 6;
-  ctx.fillStyle = CREAM;
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 2.5;
   ctx.save();
-  ctx.translate(-bodyW / 2 - 2, bodyY - (lowered ? 6 : 12));
-  ctx.rotate(-0.6 + wag * 0.04);
-  ctx.beginPath();
-  ctx.ellipse(0, -8, 7, 13, 0.2, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
+  ctx.translate(-bodyW / 2 - 4, bodyY - (lowered ? 10 : 16) + wag * 0.5);
+  fluffBlob(0, 0, 9, 9, 7, COAT, LINE);
   ctx.restore();
 
-  // ── 後ろ足（丸いおてて） ──
+  // ── 足（細い足＋足先ふわカフ） ──
   const legY = bodyY + bodyH / 2 - 3;
-  ctx.fillStyle = CREAM;
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = COAT_D;
+  ctx.lineWidth = 4.5;
 
-  function paw(x, y) {
+  function poodleLeg(x, y) {
+    // 細い足
     ctx.beginPath();
-    ctx.ellipse(x, y, 7, 9, 0, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
+    ctx.moveTo(x, y - 4);
+    ctx.lineTo(x, y + 6);
+    ctx.stroke();
+    // 足先のふわふわカフ
+    fluffBlob(x, y + 9, 6, 5.5, 6, COAT, LINE);
   }
 
   if (squatting) {
-    paw(-18, legY + 8);
-    paw(0,   legY + 9);
-    paw(14,  legY + 8);
+    poodleLeg(-18, legY + 3);
+    poodleLeg(0,   legY + 4);
+    poodleLeg(14,  legY + 3);
   } else if (walkPooping) {
-    paw(-18, legY + 7 + legSwing * 0.6);
-    paw(0,   legY + 8 - legSwing * 0.6);
-    paw(14,  legY + 7 + legSwing * 0.6);
+    poodleLeg(-18, legY + 2 + legSwing * 0.6);
+    poodleLeg(0,   legY + 3 - legSwing * 0.6);
+    poodleLeg(14,  legY + 2 + legSwing * 0.6);
   } else if (peeing) {
-    paw(-18, legY + 7);
-    paw(-2,  legY + 8);
+    poodleLeg(-18, legY + 2);
+    poodleLeg(-2,  legY + 3);
     // 上げた後ろ足
     ctx.save();
-    ctx.translate(20, legY - 2);
+    ctx.translate(20, legY - 4);
     ctx.rotate(-0.85);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 7, 10, 0, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
+    fluffBlob(0, 0, 6.5, 8, 6, COAT, LINE);
     ctx.restore();
   } else {
-    paw(-18, legY + 6 + legSwing);
-    paw(-2,  legY + 7 - legSwing);
-    paw(14,  legY + 6 + legSwing);
+    poodleLeg(-18, legY + 1 + legSwing);
+    poodleLeg(-2,  legY + 2 - legSwing);
+    poodleLeg(14,  legY + 1 + legSwing);
   }
 
-  // ── 体（ふわもこ） ──
-  ctx.fillStyle = CREAM;
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(-2, bodyY, bodyW / 2, bodyH / 2, lowered ? 0.18 : 0.05, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
+  // ── 体（もこもこカール） ──
+  fluffBlob(-2, bodyY, bodyW / 2, bodyH / 2, 9, COAT, LINE);
 
-  // おなかのふわふわ（明るい差し色）
-  ctx.fillStyle = 'rgba(255,250,240,0.7)';
-  ctx.beginPath();
-  ctx.ellipse(-2, bodyY + bodyH * 0.22, bodyW * 0.3, bodyH * 0.25, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // 胸元の明るいカール
+  fluffBlob(6, bodyY + bodyH * 0.18, bodyW * 0.26, bodyH * 0.24, 7, COAT_L, null);
 
-  // ── 頭（大きめ＝かわいい比率） ──
+  // ── 頭（大きめ）＋トップノット（アフロ） ──
   const headX = 20, headY = bodyY - 22 + breathe * 0.5;
-  ctx.fillStyle = CREAM;
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(headX, headY, 19, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
 
-  // ── たれ耳（ふわん） ──
+  // たれ耳（ロングもこもこ・頭より先に描いて後ろへ）
   const earFlop = Math.sin(t * 1.5) * 1.5;
-  ctx.fillStyle = CREAM_D;
-  ctx.beginPath();
-  ctx.ellipse(headX - 12, headY - 2 + earFlop, 7.5, 14, -0.35, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(headX + 13, headY - 1 + earFlop, 7, 13, 0.4, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
+  fluffBlob(headX - 15, headY + 6 + earFlop, 7, 13, 6, COAT_D, LINE);
+  fluffBlob(headX + 16, headY + 7 + earFlop, 6.5, 12, 6, COAT_D, LINE);
 
-  // 頭を耳の上に重ね描き（耳が後ろに見えるように）
-  ctx.fillStyle = CREAM;
-  ctx.beginPath();
-  ctx.arc(headX, headY, 17, 0, Math.PI * 2);
-  ctx.fill();
+  // 頭本体（まるもこ）
+  fluffBlob(headX, headY, 18, 17, 8, COAT, LINE);
 
-  // ── マズル（口元のふくらみ） ──
-  ctx.fillStyle = '#fdf6ea';
+  // トップノット（頭の上のふわふわアフロ）
+  fluffBlob(headX - 1, headY - 15, 12, 8.5, 7, COAT_L, LINE);
+
+  // ── マズル（小さめ・プードルらしく） ──
+  ctx.fillStyle = '#f7e3c8';
   ctx.beginPath();
-  ctx.ellipse(headX + 7, headY + 7, 9, 7, 0.1, 0, Math.PI * 2);
+  ctx.ellipse(headX + 8, headY + 8, 8, 6.5, 0.1, 0, Math.PI * 2);
   ctx.fill();
 
   // ── 目（大きくてキラキラ） ──
