@@ -486,95 +486,174 @@ function drawCoco() {
   const walkPooping= coco.poopState === 'walk-poop';
   const peeing     = coco.poopState === 'pee';
   const facing     = coco.vx >= 0 ? 1 : -1;
+  const lowered    = squatting || walkPooping;
+  const t          = Date.now() * 0.004;
+  const breathe    = Math.sin(t) * 1.2;           // ふんわり呼吸
+  const walking    = coco.poopState === 'wander' || walkPooping;
+  const legSwing   = walking ? Math.sin(Date.now() * 0.012) * 5 : 0;
+
+  // 絵本パレット
+  const CREAM   = '#f3e0c0';  // 体
+  const CREAM_D = '#e2c69a';  // 影・耳
+  const LINE    = '#8a6a48';  // やわらかい輪郭線
+  const BLUSH   = 'rgba(255,150,140,0.45)';
 
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(facing, 1);
 
-  // Wet tint on coco
   if (wetLevel > 0.3) {
-    ctx.filter = `hue-rotate(${wetLevel * 30}deg) saturate(${1 + wetLevel * 0.5})`;
+    ctx.filter = `saturate(${1 - wetLevel * 0.3}) brightness(${1 - wetLevel * 0.12})`;
   }
 
-  const bodyH = (squatting || walkPooping) ? 28 : 34;
-  const bodyW = 54;
-  const bodyY = (squatting || walkPooping) ? 5 : 0;
+  ctx.lineJoin = 'round';
+  ctx.lineCap  = 'round';
 
-  ctx.fillStyle = '#c8a46e';
-  ctx.beginPath();
-  ctx.ellipse(0, bodyY, bodyW / 2, bodyH / 2, (squatting || walkPooping) ? 0.15 : 0, 0, Math.PI * 2);
-  ctx.fill();
+  const bodyY = lowered ? 6 : 0;
+  const bodyW = 52;
+  const bodyH = (lowered ? 30 : 36) + breathe;
 
-  ctx.fillStyle = '#c8a46e';
+  // ── しっぽ（ふさふさ・ゆらゆら） ──
+  const wag = Math.sin(Date.now() * (walking ? 0.02 : 0.008)) * 6;
+  ctx.fillStyle = CREAM;
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 2.5;
+  ctx.save();
+  ctx.translate(-bodyW / 2 - 2, bodyY - (lowered ? 6 : 12));
+  ctx.rotate(-0.6 + wag * 0.04);
   ctx.beginPath();
-  ctx.ellipse(22, bodyY - 14, 16, 14, 0.1, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.ellipse(0, -8, 7, 13, 0.2, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
 
-  ctx.fillStyle = '#a0784a';
-  ctx.beginPath();
-  ctx.ellipse(28, bodyY - 22, 7, 10, 0.4, 0, Math.PI * 2);
-  ctx.fill();
+  // ── 後ろ足（丸いおてて） ──
+  const legY = bodyY + bodyH / 2 - 3;
+  ctx.fillStyle = CREAM;
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 2.5;
 
-  ctx.fillStyle = '#2c1a00';
-  ctx.beginPath();
-  ctx.arc(26, bodyY - 16, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(27, bodyY - 17, 1, 0, Math.PI * 2);
-  ctx.fill();
+  function paw(x, y) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, 7, 9, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  }
 
-  ctx.fillStyle = '#2c1a00';
-  ctx.beginPath();
-  ctx.ellipse(33, bodyY - 13, 3, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#b8945e';
-  const legY = bodyY + bodyH / 2 - 4;
   if (squatting) {
-    ctx.fillRect(-22, legY, 10, 14);
-    ctx.fillRect(-5, legY, 10, 14);
-    ctx.fillRect(8, legY, 10, 14);
-    ctx.fillStyle = '#c8a46e';
-    ctx.beginPath();
-    ctx.ellipse(-26, legY + 5, 14, 10, 0.3, 0, Math.PI * 2);
-    ctx.fill();
+    paw(-18, legY + 8);
+    paw(0,   legY + 9);
+    paw(14,  legY + 8);
   } else if (walkPooping) {
-    // 歩きながら少しお尻を下げたポーズ
-    const legSwing = Math.sin(Date.now() * 0.012) * 4;
-    ctx.fillRect(-22, legY + legSwing + 3, 10, 14);
-    ctx.fillRect(-5,  legY - legSwing + 3, 10, 14);
-    ctx.fillRect(8,   legY + legSwing + 3, 10, 14);
-    // お尻を少し落とす
-    ctx.fillStyle = '#c8a46e';
-    ctx.beginPath();
-    ctx.ellipse(-24, legY + 8, 12, 8, 0.3, 0, Math.PI * 2);
-    ctx.fill();
+    paw(-18, legY + 7 + legSwing * 0.6);
+    paw(0,   legY + 8 - legSwing * 0.6);
+    paw(14,  legY + 7 + legSwing * 0.6);
   } else if (peeing) {
-    ctx.fillRect(-22, legY, 10, 14);
-    ctx.fillRect(-5, legY, 10, 14);
+    paw(-18, legY + 7);
+    paw(-2,  legY + 8);
+    // 上げた後ろ足
     ctx.save();
-    ctx.translate(24, legY + 7);
-    ctx.rotate(-0.7);
-    ctx.fillRect(-5, -5, 10, 14);
+    ctx.translate(20, legY - 2);
+    ctx.rotate(-0.85);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 7, 10, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
     ctx.restore();
   } else {
-    const legSwing = Math.sin(Date.now() * 0.012) * 5;
-    ctx.fillRect(-22, legY + legSwing, 10, 16);
-    ctx.fillRect(-5, legY - legSwing, 10, 16);
-    ctx.fillRect(8, legY + legSwing, 10, 16);
+    paw(-18, legY + 6 + legSwing);
+    paw(-2,  legY + 7 - legSwing);
+    paw(14,  legY + 6 + legSwing);
   }
 
-  ctx.strokeStyle = '#c8a46e';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
+  // ── 体（ふわもこ） ──
+  ctx.fillStyle = CREAM;
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(-bodyW / 2 + 4, bodyY);
-  ctx.quadraticCurveTo(
-    -bodyW / 2 - 14, bodyY - ((squatting || walkPooping) ? 8 : 18),
-    -bodyW / 2 - 6,  bodyY - ((squatting || walkPooping) ? 18 : 32)
-  );
+  ctx.ellipse(-2, bodyY, bodyW / 2, bodyH / 2, lowered ? 0.18 : 0.05, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // おなかのふわふわ（明るい差し色）
+  ctx.fillStyle = 'rgba(255,250,240,0.7)';
+  ctx.beginPath();
+  ctx.ellipse(-2, bodyY + bodyH * 0.22, bodyW * 0.3, bodyH * 0.25, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 頭（大きめ＝かわいい比率） ──
+  const headX = 20, headY = bodyY - 22 + breathe * 0.5;
+  ctx.fillStyle = CREAM;
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(headX, headY, 19, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // ── たれ耳（ふわん） ──
+  const earFlop = Math.sin(t * 1.5) * 1.5;
+  ctx.fillStyle = CREAM_D;
+  ctx.beginPath();
+  ctx.ellipse(headX - 12, headY - 2 + earFlop, 7.5, 14, -0.35, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(headX + 13, headY - 1 + earFlop, 7, 13, 0.4, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // 頭を耳の上に重ね描き（耳が後ろに見えるように）
+  ctx.fillStyle = CREAM;
+  ctx.beginPath();
+  ctx.arc(headX, headY, 17, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── マズル（口元のふくらみ） ──
+  ctx.fillStyle = '#fdf6ea';
+  ctx.beginPath();
+  ctx.ellipse(headX + 7, headY + 7, 9, 7, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 目（大きくてキラキラ） ──
+  const blink = (Math.sin(Date.now() * 0.002) > 0.97) ? 0.15 : 1;
+  ctx.fillStyle = '#3a2a1a';
+  ctx.beginPath();
+  ctx.ellipse(headX - 2, headY - 2, 3.6, 4.2 * blink, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(headX + 12, headY - 2, 3.2, 3.8 * blink, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (blink === 1) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(headX - 1, headY - 3.5, 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(headX + 13, headY - 3.5, 1.2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ── 鼻（まんまるハート風） ──
+  ctx.fillStyle = '#5a4030';
+  ctx.beginPath();
+  ctx.ellipse(headX + 8, headY + 4.5, 3.4, 2.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 口（にっこり）
+  ctx.strokeStyle = '#5a4030';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(headX + 5, headY + 8, 4, 0.2, Math.PI * 0.85);
   ctx.stroke();
+
+  // がんばり顔（うんち中はぎゅっと）
+  if (lowered) {
+    ctx.strokeStyle = '#8a6a48';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(headX - 6, headY - 8); ctx.lineTo(headX - 1, headY - 6.5);
+    ctx.moveTo(headX + 16, headY - 8); ctx.lineTo(headX + 11, headY - 6.5);
+    ctx.stroke();
+  }
+
+  // ── ほっぺ ──
+  ctx.fillStyle = BLUSH;
+  ctx.beginPath();
+  ctx.ellipse(headX - 8, headY + 5, 4, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(headX + 17, headY + 5, 3.4, 2.4, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.filter = 'none';
 
